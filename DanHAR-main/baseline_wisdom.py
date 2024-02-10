@@ -19,7 +19,7 @@ from torchstat import stat
 
 from sklearn.metrics import precision_score, recall_score, f1_score,accuracy_score,confusion_matrix
 import sklearn.metrics as sm
-import tqdm as tqdm
+from tqdm import tqdm
 
 os.environ['CUDA_VISIBLE_DEVICES']='0'
 
@@ -36,21 +36,21 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 # Data
 print('==> Preparing data..')
 
-train_x = np.load('/home/gaowenbing/desktop/dd/Torch_Har_cbam/HAR_Dataset/wisdm/x_train.npy')
+train_x = np.load('/content/drive/MyDrive/project_codes_data/DanHAR-main/WISDM_preprocess/train_x21.npy')
 shape = train_x.shape
 train_x = torch.from_numpy(np.reshape(train_x.astype(np.float), [shape[0], 1, shape[1], shape[2]]))
 train_x = train_x.type(torch.FloatTensor).cuda()
 
-train_y = (np.load('/home/gaowenbing/desktop/dd/Torch_Har_cbam/HAR_Dataset/wisdm/y_train.npy'))
+train_y = (np.load('/content/drive/MyDrive/project_codes_data/DanHAR-main/WISDM_preprocess/train_y21.npy'))
 train_y = torch.from_numpy(train_y)
 train_y = train_y.type(torch.FloatTensor).cuda()
 
 
-test_x = np.load('/home/gaowenbing/desktop/dd/Torch_Har_cbam/HAR_Dataset/wisdm/x_test.npy')
+test_x = np.load('/content/drive/MyDrive/project_codes_data/DanHAR-main/WISDM_preprocess/test_x21.npy')
 test_x = torch.from_numpy(np.reshape(test_x.astype(np.float), [test_x.shape[0], 1, test_x.shape[1], test_x.shape[2]]))
 test_x = test_x.type(torch.FloatTensor)
 
-test_y = np.load('/home/gaowenbing/desktop/dd/Torch_Har_cbam/HAR_Dataset/wisdm/y_test.npy')
+test_y = np.load('/content/drive/MyDrive/project_codes_data/DanHAR-main/WISDM_preprocess/test_y21.npy')
 test_y = torch.from_numpy(test_y.astype(np.float32))
 test_y = test_y.type(torch.FloatTensor)
 
@@ -98,7 +98,7 @@ class cnn(nn.Module):
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(24192, 6)
+            nn.Linear(24192, 18)
         )
 
 
@@ -185,7 +185,8 @@ def train(epoch):
     train_loss = 0
     total = 0
     total=total
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
+    correct=0
+    for batch_idx, (inputs, targets) in enumerate(tqdm(trainloader, desc="Training")):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         inputs=inputs.type(torch.FloatTensor)
@@ -205,14 +206,14 @@ def train(epoch):
         predicted=predicted
         taccuracy = (torch.sum(predicted == targets.long()).type(torch.FloatTensor) / targets.size(0)).cuda()
         # print(type(predicted),type(targets),predicted,targets,'type(predicted),type(targets)')
-        # correct += predicted.eq(targets).sum().item()
+        correct += predicted.eq(targets).sum().item()
         train_error = 1 - taccuracy.item()
-        # print('train:',taccuracy.item(),'||',train_error)
+        print('train:',taccuracy.item(),'||',train_error)
         # np.savetxt('matplot/opp_train_error.txt',train_error)
-        # progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-        #              % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
-        # print(progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-        #              % (train_loss/(batch_idx+1), 100.*correct/total, correct, total)))
+
+        print('Loss: %.3f | Acc: %.3f%% (%d/%d)'
+          % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+        
 
 
 def test(epoch):
@@ -257,18 +258,18 @@ def test(epoch):
         #     np.save('/home/gaowenbing/desktop/dd/Torch_Har_cbam/store_visual/wisdom/wisdom_error_b_2',error_list)
 
     # Save checkpoint.
-    # acc = 100.*correct/total
-    # if acc > best_acc:
-    #     print('Saving..')
-    #     state = {
-    #         'net': net.state_dict(),
-    #         'acc': acc,
-    #         'epoch': epoch,
-    #     }
-    #     if not os.path.isdir('checkpoint'):
-    #         os.mkdir('checkpoint')
-    #     torch.save(state, './checkpoint/ckpt.pth')
-    #     best_acc = acc
+    acc = 100.*correct/total
+    if acc > best_acc:
+        print('Saving..')
+        state = {
+            'net': net.state_dict(),
+            'acc': acc,
+            'epoch': epoch,
+        }
+        if not os.path.isdir('checkpoint'):
+            os.mkdir('checkpoint')
+        torch.save(state, './checkpoint/ckpt.pth')
+        best_acc = acc
 
 
 for epoch in range(start_epoch, start_epoch+500):
