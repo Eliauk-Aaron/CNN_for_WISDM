@@ -42,17 +42,8 @@ LABELS = [
     'S'
 ]
 
-# LABELS = [
-#     'Downstairs',
-#     'Jogging',
-#     'Sitting',
-#     'Standing',
-#     'Upstairs',
-#     'Walking'
-# ]
-
-# DATA_PATH = args.DATA_PATH
-# DATA_PATH = 'WISDM_ar_v1.1_raw.txt'
+# 定义eating的标签列表
+target_labels = ['H', 'I', 'J', 'K', 'L']
 
 base_path = "/content/drive/MyDrive/project_codes_data/wisdm-dataset/raw/phone/accel/"
 DATA_PATH = [f"{base_path}data_{i}_accel_phone.txt" for i in range(1600, 1651)]
@@ -111,36 +102,41 @@ if __name__ == '__main__':
     data_convoluted = []
     labels = []
 
+    # 在这里，我们定义一个筛选后的数据和标签容器
+    data_filtered = []
+    labels_filtered = []
+
     # Slide a "SEGMENT_TIME_SIZE" wide window with a step size of "TIME_STEP"
     for i in range(0, len(data) - SEGMENT_TIME_SIZE, TIME_STEP):
-        x = data['x-axis'].values[i: i + SEGMENT_TIME_SIZE]
-        y = data['y-axis'].values[i: i + SEGMENT_TIME_SIZE]
-        z = data['z-axis'].values[i: i + SEGMENT_TIME_SIZE]
-        data_convoluted.append([x, y, z])
+      segment = data.iloc[i: i + SEGMENT_TIME_SIZE]
+      # Label for a data window is the label that appears most commonly
+      label = segment['activity'].value_counts().idxmax()
+      if label in target_labels:
+        x = segment['x-axis'].values
+        y = segment['y-axis'].values
+        z = segment['z-axis'].values
+        data_filtered.append([x, y, z])
+        labels_filtered.append(label)
 
-        # # Label for a data window is the label that appears most commonly
-        # label = stats.mode(data['activity'][i: i + SEGMENT_TIME_SIZE])[0][0]
-        # labels.append(label)
+    # 将筛选后的数据转换为numpy数组(x y z 的并列->堆叠)
+    data_filtered = np.asarray(data_filtered, dtype=np.float32).transpose(0, 2, 1)
 
-        # Label for a data window is the label that appears most commonly
-        label = data['activity'][i: i + SEGMENT_TIME_SIZE].value_counts().idxmax()
-        labels.append(label)
-
-    # Convert to numpy (x y z 的并列->堆叠)
-    data_convoluted = np.asarray(data_convoluted, dtype=np.float32).transpose(0, 2, 1)
-
-    # One-hot encoding
-    labels = np.asarray(pd.get_dummies(labels), dtype=np.float32)
+    # 将标签转换为整数索引
+    label_to_index = {label: index for index, label in enumerate(target_labels)}
+    labels_index = [label_to_index[label] for label in labels_filtered]
+    # 进行One-hot编码
+    labels_filtered = np.eye(len(target_labels))[labels_index]
     print('-'*50)
-    print("Convoluted data shape: ", data_convoluted.shape)
-    print("Labels shape:", labels.shape)
+    print("Filtered data shape: ", data_filtered.shape)
+    print("Filtered labels shape:", labels_filtered.shape)
 
-    # SPLIT INTO TRAINING AND TEST SETS
-    x_train, x_test, y_train, y_test = train_test_split(data_convoluted, labels, test_size=0.3, random_state=10)
-    np.save('train_x21.npy', x_train)
-    np.save('train_y21.npy', y_train)
-    np.save('test_x21.npy', x_test)
-    np.save('test_y21.npy', y_test)
+    # 使用筛选后的数据进行训练/测试集分割等后续工作
+    x_train, x_test, y_train, y_test = train_test_split(data_filtered, labels_filtered, test_size=0.3, random_state=10)
+
+    np.save('train_x_eat_p_acc.npy', x_train)
+    np.save('train_y_eat_p_acc.npy', y_train)
+    np.save('test_x_eat_p_acc.npy', x_test)
+    np.save('test_y_eat_p_acc.npy', y_test)
 
     print('-'*50)
     print("x train size: ", x_train.shape)
